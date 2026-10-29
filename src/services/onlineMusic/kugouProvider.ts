@@ -844,8 +844,8 @@ const getKugouHistoryName = async (date: string): Promise<string> => {
 
 export const kugouProvider: OnlineMusicProvider = {
     id: 'kugou',
-    displayName: 'KuGou Music',
-    shortName: '酷狗',
+    displayName: 'KuGou Concept (Lite)',
+    shortName: '酷狗概念版',
     getAvailability: getKugouTransportAvailability,
     capabilities: {
         search: true, playback: true, lyrics: true, auth: true, userLibrary: true,

@@ -39,18 +39,21 @@ const OnlineProviderConnectPanel = ({
         <div className="flex flex-wrap items-center justify-center gap-3.5 max-w-md w-full pt-2">
             {providers.map(provider => {
                 const configured = provider.availability.configured;
+                // KuGou stays clickable while unconfigured: clicking opens the
+                // runtime API-base config flow instead of being a dead button.
+                const clickable = configured || provider.providerId === 'kugou';
                 const isCurrentActive = provider.providerId === activeProviderId;
                 const badge = providerBadge(provider);
                 return (
                     <button
                         key={provider.providerId}
                         type="button"
-                        disabled={!configured}
+                        disabled={!clickable}
                         onClick={() => onSelect(provider)}
                         className={`flex items-center gap-3 px-5 py-3 rounded-2xl font-bold text-sm transition-all hover:scale-105 cursor-pointer border ${isCurrentActive
                             ? (isDaylight ? 'bg-black text-white border-black shadow-md' : 'bg-white text-black border-white shadow-md')
                             : (isDaylight ? 'bg-white/60 hover:bg-white/90 text-zinc-900 border-black/5 shadow-sm' : 'bg-white/5 hover:bg-white/10 text-white border-white/10')
-                            } ${!configured ? 'opacity-40 cursor-not-allowed' : ''}`}
+                            } ${!clickable ? 'opacity-40 cursor-not-allowed' : ''}`}
                     >
                         <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-black text-white ${badge.className}`}>
                             {badge.label}

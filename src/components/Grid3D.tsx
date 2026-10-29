@@ -24,10 +24,10 @@ import OnlineProviderSwitcher from './app/home/OnlineProviderSwitcher';
 import OnlineProviderConnectPanel from './app/home/OnlineProviderConnectPanel';
 import OnlineProviderLoginModal from './app/home/OnlineProviderLoginModal';
 import KugouApiConfigModal from './app/home/KugouApiConfigModal';
-import { KUGOU_API_BASE_STORAGE_KEY, getWebApiBase } from '../services/onlineMusic/kugouTransport';
+import { KUGOU_API_BASE_STORAGE_KEY, getKugouTransportAvailability, getWebApiBase } from '../services/onlineMusic/kugouTransport';
 import { resolveOnlineProviderAccountView } from './app/home/onlineProviderAccountView';
 import type { MediaId, ProviderCollection, ProviderUser } from '../types/onlineMusic';
-import { supportsLocalMusicImport } from '../platform/runtime';
+import { isCapacitorAndroid, supportsLocalMusicImport } from '../platform/runtime';
 
 // src/components/Grid3D.tsx
 // Glassmorphic interactive desktop home view replacing the legacy 3D carousel.
@@ -275,15 +275,25 @@ export const Grid3D: React.FC<Grid3DProps> = (props) => {
         },
     });
 
+    // Android builds focus on KuGou Lite + local music; NetEase stays available
+    // on desktop (Electron/Web) only.
+    const visibleProviders = isCapacitorAndroid()
+        ? (onlineProviderPlatform?.providers || []).filter(provider => provider.providerId !== 'netease')
+        : (onlineProviderPlatform?.providers || omni.getProviderSummaries());
+
     const initLogin = async (providerId = activeProviderId) => {
-        const summary = onlineProviderPlatform?.providers.find(provider => provider.providerId === providerId);
-        if (summary && !summary.availability.configured) {
-            if (providerId === 'kugou') {
-                // No KuGou API base configured: let the user enter one at runtime
-                // instead of failing silently.
+        if (providerId === 'kugou') {
+            // Live check: the platform snapshot may be stale right after the user
+            // saved an API base, so read the transport availability directly.
+            if (!getKugouTransportAvailability().configured) {
                 setShowKugouApiConfig(true);
+                return;
             }
-            return;
+        } else {
+            const summary = onlineProviderPlatform?.providers.find(provider => provider.providerId === providerId);
+            if (summary && !summary.availability.configured) {
+                return;
+            }
         }
         setLoginProviderId(providerId);
         setShowLoginModal(true);
@@ -296,6 +306,9 @@ export const Grid3D: React.FC<Grid3DProps> = (props) => {
         } catch {
             // Storage unavailable; nothing sensible to do here.
         }
+        // Re-evaluate provider summaries so the saved base is reflected everywhere,
+        // then go straight to QR login (initLogin re-checks availability live).
+        onlineProviderPlatform?.refreshSummaries();
         setShowKugouApiConfig(false);
         void initLogin('kugou');
     };
@@ -491,7 +504,8 @@ export const Grid3D: React.FC<Grid3DProps> = (props) => {
             }
         } catch (error) {
             console.error('[Grid3D] Failed to import local folder:', error);
-            alert(t('localMusic.importNotSupported'));
+            const detail = error instanceof Error ? error.message : String(error);
+            alert(`${t('localMusic.importNotSupported')}\n${detail}`);
         } finally {
             setIsLocalImporting(false);
         }
@@ -716,7 +730,7 @@ export const Grid3D: React.FC<Grid3DProps> = (props) => {
                     </div>
                 ) : isOnlineTab && activeAccountView === 'guest' ? (
                     <OnlineProviderConnectPanel
-                        providers={onlineProviderPlatform?.providers || omni.getProviderSummaries()}
+                        providers={visibleProviders}
                         activeProviderId={activeProviderId}
                         isDaylight={isDaylight}
                         title={activeProviderNeedsRelogin ? t('status.loginExpired') : t('home.guestTitle')}
@@ -839,7 +853,7 @@ export const Grid3D: React.FC<Grid3DProps> = (props) => {
 
             {onlineProviderPlatform && (
                 <OnlineProviderSwitcher
-                    providers={onlineProviderPlatform.providers}
+                    providers={visibleProviders}
                     activeProviderId={activeProviderId}
                     isDaylight={isDaylight}
                     onBackToPlayer={onBackToPlayer}

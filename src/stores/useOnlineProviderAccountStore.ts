@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { isCapacitorAndroid } from '../platform/runtime';
 import type { MediaId, OnlineProviderId, ProviderCollection, ProviderUser } from '../types/onlineMusic';
 
 // src/stores/useOnlineProviderAccountStore.ts
@@ -24,9 +25,15 @@ type OnlineProviderAccountStore = {
 
 const ACTIVE_PROVIDER_KEY = 'active_online_provider_id';
 
+// Android builds hide NetEase (KuGou Lite + local music focus), so the default
+// and any stale stored 'netease' value both resolve to 'kugou' there.
 const getInitialProviderId = (): OnlineProviderId => {
-    if (typeof localStorage === 'undefined' || typeof localStorage.getItem !== 'function') return 'netease';
-    return localStorage.getItem(ACTIVE_PROVIDER_KEY) || 'netease';
+    const androidDefault: OnlineProviderId = isCapacitorAndroid() ? 'kugou' : 'netease';
+    if (typeof localStorage === 'undefined' || typeof localStorage.getItem !== 'function') return androidDefault;
+    const stored = localStorage.getItem(ACTIVE_PROVIDER_KEY);
+    if (!stored) return androidDefault;
+    if (isCapacitorAndroid() && stored === 'netease') return 'kugou';
+    return stored as OnlineProviderId;
 };
 
 const emptyAccount = (): OnlineProviderAccountState => ({

@@ -1,4 +1,4 @@
-import { useCallback, useMemo } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { omni } from '../services/onlineMusic/omni';
 import { useOnlineProviderAccountStore } from '../stores/useOnlineProviderAccountStore';
@@ -12,6 +12,7 @@ export type OnlineProviderPlatformState = {
     activeProvider: ProviderAccountSummary | undefined;
     switchProvider: (providerId: OnlineProviderId) => Promise<boolean>;
     refreshProvider: (providerId: OnlineProviderId) => Promise<unknown>;
+    refreshSummaries: () => void;
     logoutProvider: (providerId: OnlineProviderId) => Promise<void>;
     completeLogin: (providerId: OnlineProviderId) => Promise<boolean>;
 };
@@ -71,7 +72,15 @@ export const useOnlineProviderPlatform = (
         setActiveProviderId: state.setActiveProviderId,
     })));
 
-    const providers = useMemo<ProviderAccountSummary[]>(() => omni.getProviderSummaries(), [accounts]);
+    // Provider summaries cache availability snapshots (e.g. KuGou API base in
+    // localStorage). accounts only changes on login state, so a runtime config
+    // change needs an explicit bump to re-evaluate getProviderSummaries().
+    const [summaryVersion, setSummaryVersion] = useState(0);
+    const providers = useMemo<ProviderAccountSummary[]>(() => {
+        void summaryVersion;
+        return omni.getProviderSummaries();
+    }, [accounts, summaryVersion]);
+    const refreshSummaries = useCallback(() => setSummaryVersion(version => version + 1), []);
     const refreshProvider = useCallback(async (providerId: OnlineProviderId) => {
         return await refreshers[providerId]?.();
     }, [refreshers]);
@@ -98,5 +107,5 @@ export const useOnlineProviderPlatform = (
     }), [activeProviderId, prepareSwitch, refreshers, setActiveProviderId]);
 
     const activeProvider = providers.find(provider => provider.providerId === activeProviderId) || providers[0];
-    return { providers, activeProviderId, activeProvider, switchProvider, refreshProvider, logoutProvider, completeLogin };
+    return { providers, activeProviderId, activeProvider, switchProvider, refreshProvider, refreshSummaries, logoutProvider, completeLogin };
 };

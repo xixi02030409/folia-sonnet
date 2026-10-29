@@ -24,7 +24,7 @@ import OnlineProviderSwitcher from './app/home/OnlineProviderSwitcher';
 import OnlineProviderConnectPanel from './app/home/OnlineProviderConnectPanel';
 import OnlineProviderLoginModal from './app/home/OnlineProviderLoginModal';
 import KugouApiConfigModal from './app/home/KugouApiConfigModal';
-import { KUGOU_API_BASE_STORAGE_KEY, getKugouTransportAvailability, getWebApiBase } from '../services/onlineMusic/kugouTransport';
+import { KUGOU_API_BASE_STORAGE_KEY, getKugouTransportAvailability, getWebApiBase, prepareKugouTransport } from '../services/onlineMusic/kugouTransport';
 import { resolveOnlineProviderAccountView } from './app/home/onlineProviderAccountView';
 import type { MediaId, ProviderCollection, ProviderUser } from '../types/onlineMusic';
 import { isCapacitorAndroid, supportsLocalMusicImport } from '../platform/runtime';
@@ -283,9 +283,16 @@ export const Grid3D: React.FC<Grid3DProps> = (props) => {
 
     const initLogin = async (providerId = activeProviderId) => {
         if (providerId === 'kugou') {
+            // Android: boot the embedded loopback server (MD3Music rust engine,
+            // zero-config) before judging availability, then refresh summaries
+            // so the connect panel stops showing the manual-config state.
+            await prepareKugouTransport();
+            onlineProviderPlatform?.refreshSummaries();
             // Live check: the platform snapshot may be stale right after the user
             // saved an API base, so read the transport availability directly.
             if (!getKugouTransportAvailability().configured) {
+                // Embedded server unavailable AND nothing manually configured:
+                // fall back to the manual API-base flow.
                 setShowKugouApiConfig(true);
                 return;
             }
@@ -308,6 +315,17 @@ export const Grid3D: React.FC<Grid3DProps> = (props) => {
         }
         // Re-evaluate provider summaries so the saved base is reflected everywhere,
         // then go straight to QR login (initLogin re-checks availability live).
+        onlineProviderPlatform?.refreshSummaries();
+        setShowKugouApiConfig(false);
+        void initLogin('kugou');
+    };
+
+    const clearKugouApiBase = () => {
+        try {
+            window.localStorage.removeItem(KUGOU_API_BASE_STORAGE_KEY);
+        } catch {
+            // Storage unavailable; nothing sensible to do here.
+        }
         onlineProviderPlatform?.refreshSummaries();
         setShowKugouApiConfig(false);
         void initLogin('kugou');
@@ -827,9 +845,11 @@ export const Grid3D: React.FC<Grid3DProps> = (props) => {
                         placeholder={t('home.kugouApiConfigPlaceholder')}
                         saveLabel={t('home.kugouApiConfigSave')}
                         invalidLabel={t('home.kugouApiConfigInvalid')}
+                        clearLabel={t('home.kugouApiConfigClear')}
                         closeLabel={t('home.closeLogin')}
                         initialValue={getWebApiBase()}
                         onSave={saveKugouApiBase}
+                        onClear={clearKugouApiBase}
                         onClose={() => setShowKugouApiConfig(false)}
                     />
                 )}

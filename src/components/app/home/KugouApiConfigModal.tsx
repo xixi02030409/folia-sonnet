@@ -11,8 +11,10 @@ type KugouApiConfigModalProps = {
     saveLabel: string;
     invalidLabel: string;
     closeLabel: string;
+    clearLabel?: string;
     initialValue?: string;
     onSave: (apiBase: string) => void;
+    onClear?: () => void;
     onClose: () => void;
 };
 
@@ -35,8 +37,10 @@ const KugouApiConfigModal = ({
     saveLabel,
     invalidLabel,
     closeLabel,
+    clearLabel,
     initialValue = '',
     onSave,
+    onClear,
     onClose,
 }: KugouApiConfigModalProps) => {
     const [value, setValue] = useState(initialValue);
@@ -113,6 +117,16 @@ const KugouApiConfigModal = ({
                 >
                     {saveLabel}
                 </button>
+                {onClear && clearLabel && (
+                    <button
+                        type="button"
+                        onClick={onClear}
+                        className="w-full mt-2 px-4 py-2.5 rounded-xl bg-transparent hover:bg-white/5 text-xs opacity-50 hover:opacity-80 transition-colors cursor-pointer"
+                        style={{ color: 'var(--text-primary)' }}
+                    >
+                        {clearLabel}
+                    </button>
+                )}
             </motion.div>
         </motion.div>
     );

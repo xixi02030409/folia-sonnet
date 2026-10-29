@@ -1,6 +1,7 @@
 import md5 from 'blueimp-md5';
 import { OnlineProviderError } from '../../types/onlineMusic';
 import { readProviderSessionValue, removeProviderSessionValue, writeProviderSessionValue } from './providerStorage';
+import { getEmbeddedApiBase } from '../kugouEmbeddedServer';
 import { resolveFoliaApiUrl } from '../webApi';
 
 // src/services/onlineMusic/kugouTransport.ts
@@ -77,7 +78,9 @@ export const getWebApiBase = (): string => {
     const processValue = typeof process !== 'undefined'
         ? String(process.env?.VITE_KUGOU_API_BASE || '')
         : '';
-    const value = readRuntimeApiBaseOverride() || viteValue || processValue;
+    // Priority: manual runtime override > embedded Android server (zero-config
+    // loopback, concept-lite protocol) > build-time env.
+    const value = readRuntimeApiBaseOverride() || getEmbeddedApiBase() || viteValue || processValue;
     return value.trim().replace(/\/$/, '');
 };
 
@@ -212,6 +215,16 @@ export const getKugouTransportAvailability = () => {
     return getWebApiBase()
         ? { configured: true } as const
         : { configured: false, reason: 'not-configured' as const };
+};
+
+/**
+ * Warms up the Android embedded server (no-op elsewhere) so that
+ * getKugouTransportAvailability()/getWebApiBase() reflect it. The caller must
+ * re-read availability after this resolves.
+ */
+export const prepareKugouTransport = async (): Promise<void> => {
+    const { ensureEmbeddedKugouServer } = await import('../kugouEmbeddedServer');
+    await ensureEmbeddedKugouServer();
 };
 
 // Routes one provider request through Electron IPC or an explicitly configured Web backend.

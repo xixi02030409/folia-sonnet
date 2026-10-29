@@ -10,5 +10,6 @@ public class MainActivity extends BridgeActivity {
         // Capacitor 8: custom plugins MUST be registered here, otherwise the JS
         // side gets "not implemented" for every LocalMedia call and SAF never opens.
         registerPlugin(LocalMediaPlugin.class);
+        registerPlugin(KugouServerPlugin.class);
     }
 }

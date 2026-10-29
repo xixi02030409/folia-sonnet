@@ -49,6 +49,7 @@ import { useAppNavigation } from './hooks/useAppNavigation';
 import { useNeteaseLibrary } from './hooks/useNeteaseLibrary';
 import { useKugouLibrary } from './hooks/useKugouLibrary';
 import { useOnlineProviderPlatform } from './hooks/useOnlineProviderPlatform';
+import { ensureEmbeddedKugouServer } from './services/kugouEmbeddedServer';
 import { useAppPreferences } from './hooks/useAppPreferences';
 import { useElectronPlaybackBridge } from './hooks/useElectronPlaybackBridge';
 import { useElectronNeteaseApiStatus } from './hooks/useElectronNeteaseApiStatus';
@@ -908,6 +909,16 @@ export default function App() {
         };
     }, [handleCancelProviderSwitch, handleConfirmProviderSwitch, isDaylight, providerSwitchPending, t]);
     const onlineProviderPlatform = useOnlineProviderPlatform(onlineProviderRefreshers, prepareOnlineProviderSwitch, onlineProviderLogouts);
+    // Android: boot the embedded KuGou concept server (loopback, zero-config)
+    // during startup so the connect panel shows it available immediately
+    // instead of waiting for the user to tap the provider.
+    useEffect(() => {
+        let cancelled = false;
+        ensureEmbeddedKugouServer().then(port => {
+            if (!cancelled && port) onlineProviderPlatform.refreshSummaries();
+        });
+        return () => { cancelled = true; };
+    }, [onlineProviderPlatform.refreshSummaries]);
     const handleActiveProviderSyncData = useCallback(async () => {
         const providerId = onlineProviderPlatform.activeProviderId;
         if (providerId === 'netease') {

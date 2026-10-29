@@ -57,14 +57,27 @@ const ENDPOINTS: Record<KugouOperation, string> = {
     playlist_tracks_del: '/playlist/tracks/del',
 };
 
-const getWebApiBase = (): string => {
+// Runtime override key. Takes precedence over build-time env so the API base can be
+// changed on device (e.g. after redeploying the backend) without rebuilding the app.
+export const KUGOU_API_BASE_STORAGE_KEY = 'folia_kugou_api_base';
+
+const readRuntimeApiBaseOverride = (): string => {
+    if (typeof window === 'undefined' || !window.localStorage) return '';
+    try {
+        return String(window.localStorage.getItem(KUGOU_API_BASE_STORAGE_KEY) || '').trim();
+    } catch {
+        return '';
+    }
+};
+
+export const getWebApiBase = (): string => {
     const viteValue = typeof import.meta !== 'undefined' && import.meta.env?.MODE !== 'test'
         ? String((import.meta as ImportMeta & { env?: Record<string, string> }).env?.VITE_KUGOU_API_BASE || '')
         : '';
     const processValue = typeof process !== 'undefined'
         ? String(process.env?.VITE_KUGOU_API_BASE || '')
         : '';
-    const value = viteValue || processValue;
+    const value = readRuntimeApiBaseOverride() || viteValue || processValue;
     return value.trim().replace(/\/$/, '');
 };
 

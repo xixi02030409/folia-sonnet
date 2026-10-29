@@ -23,6 +23,8 @@ import { getSongCoverUrl } from '../services/onlineMusic/songMetadata';
 import OnlineProviderSwitcher from './app/home/OnlineProviderSwitcher';
 import OnlineProviderConnectPanel from './app/home/OnlineProviderConnectPanel';
 import OnlineProviderLoginModal from './app/home/OnlineProviderLoginModal';
+import KugouApiConfigModal from './app/home/KugouApiConfigModal';
+import { KUGOU_API_BASE_STORAGE_KEY, getWebApiBase } from '../services/onlineMusic/kugouTransport';
 import { resolveOnlineProviderAccountView } from './app/home/onlineProviderAccountView';
 import type { MediaId, ProviderCollection, ProviderUser } from '../types/onlineMusic';
 import { supportsLocalMusicImport } from '../platform/runtime';
@@ -252,6 +254,7 @@ export const Grid3D: React.FC<Grid3DProps> = (props) => {
 
     // Login QR State
     const [showLoginModal, setShowLoginModal] = useState(false);
+    const [showKugouApiConfig, setShowKugouApiConfig] = useState(false);
     const [loginProviderId, setLoginProviderId] = useState(activeProviderId);
     const {
         qrCodeImg,
@@ -274,10 +277,27 @@ export const Grid3D: React.FC<Grid3DProps> = (props) => {
 
     const initLogin = async (providerId = activeProviderId) => {
         const summary = onlineProviderPlatform?.providers.find(provider => provider.providerId === providerId);
-        if (summary && !summary.availability.configured) return;
+        if (summary && !summary.availability.configured) {
+            if (providerId === 'kugou') {
+                // No KuGou API base configured: let the user enter one at runtime
+                // instead of failing silently.
+                setShowKugouApiConfig(true);
+            }
+            return;
+        }
         setLoginProviderId(providerId);
         setShowLoginModal(true);
         await startQrLogin(providerId);
+    };
+
+    const saveKugouApiBase = (apiBase: string) => {
+        try {
+            window.localStorage.setItem(KUGOU_API_BASE_STORAGE_KEY, apiBase);
+        } catch {
+            // Storage unavailable; nothing sensible to do here.
+        }
+        setShowKugouApiConfig(false);
+        void initLogin('kugou');
     };
 
     // Online provider collection details
@@ -786,6 +806,19 @@ export const Grid3D: React.FC<Grid3DProps> = (props) => {
 
             {/* Login Modal */}
             <AnimatePresence>
+                {showKugouApiConfig && (
+                    <KugouApiConfigModal
+                        title={t('home.kugouApiConfigTitle')}
+                        description={t('home.kugouApiConfigDesc')}
+                        placeholder={t('home.kugouApiConfigPlaceholder')}
+                        saveLabel={t('home.kugouApiConfigSave')}
+                        invalidLabel={t('home.kugouApiConfigInvalid')}
+                        closeLabel={t('home.closeLogin')}
+                        initialValue={getWebApiBase()}
+                        onSave={saveKugouApiBase}
+                        onClose={() => setShowKugouApiConfig(false)}
+                    />
+                )}
                 {showLoginModal && (
                     <OnlineProviderLoginModal
                         title={t(loginProviderId === 'kugou' ? 'home.loginTitleKugou' : 'home.loginTitle')}

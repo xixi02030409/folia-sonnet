@@ -28,6 +28,7 @@ import {
 import { clearSessionValues, putSessionValue, readSession } from './repositories/sessionRepository';
 import { readThemeRegistryEntries, writeThemeRegistryEntries } from './repositories/themeRegistryRepository';
 import { clearCoverAssets, getCoverAssetUsage } from './binaryAssetStore';
+import { reviveLocalMusicHandle } from './localMusicCapacitorAdapter';
 
 // src/services/db.ts
 // Keeps the historical storage API stable while delegating every IndexedDB operation to Dexie repositories.
@@ -236,9 +237,15 @@ export const saveDirHandles = async (handles: Record<string, FileSystemDirectory
   await saveToCache('local_dir_handles', handles);
 };
 
-export const getDirHandles = async (): Promise<Record<string, FileSystemDirectoryHandle>> => (
-  (await getFromCache<Record<string, FileSystemDirectoryHandle>>('local_dir_handles')) || {}
-);
+export const getDirHandles = async (): Promise<Record<string, FileSystemDirectoryHandle>> => {
+  const handles = (await getFromCache<Record<string, FileSystemDirectoryHandle>>('local_dir_handles')) || {};
+  // Capacitor adapter handles lose their prototype methods across
+  // structured clone - restore them on the way out.
+  for (const key of Object.keys(handles)) {
+    handles[key] = reviveLocalMusicHandle(handles[key]);
+  }
+  return handles;
+};
 
 export const deleteDirHandle = async (rootFolderName: string): Promise<void> => {
   const handles = await getDirHandles();

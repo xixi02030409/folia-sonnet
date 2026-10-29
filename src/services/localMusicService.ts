@@ -17,6 +17,13 @@ import { removeCachedCover } from './coverCache';
 import { getOnlineMusicProvider } from './onlineMusic/providerRegistry';
 import { getProviderSongMetadata } from './onlineMusic/songMetadata';
 import { normalizeLyricMatchMetadataCandidate } from './onlineMetadataSearchService';
+import { isCapacitorAndroid } from '../platform/runtime';
+import {
+    invalidateTreeIndex,
+    isFakeDirectoryHandle,
+    pickDirectoryCapacitor,
+    reviveLocalMusicHandle,
+} from './localMusicCapacitorAdapter';
 
 
 type EmbeddedMetadata = EmbeddedMetadataResult;
@@ -138,6 +145,12 @@ async function getImportDirectoryHandle(expectedRootName?: string): Promise<File
             requestPermission: (descriptor: { mode: 'read' | 'readwrite'; }) => Promise<PermissionState>;
         };
 
+        // Capacitor adapter: drop the cached tree listing so a resync sees
+        // files added since the last import.
+        if (isFakeDirectoryHandle(persistedHandle)) {
+            invalidateTreeIndex(persistedHandle.treeUri);
+        }
+
         let permission = await permissionAwareHandle.queryPermission({ mode: 'read' });
         if (permission !== 'granted') {
             permission = await permissionAwareHandle.requestPermission({ mode: 'read' });
@@ -151,6 +164,9 @@ async function getImportDirectoryHandle(expectedRootName?: string): Promise<File
     }
 
     if (!('showDirectoryPicker' in window)) {
+        if (isCapacitorAndroid()) {
+            return await pickDirectoryCapacitor() as unknown as FileSystemDirectoryHandle;
+        }
         throw new Error('File System Access API not supported in this browser');
     }
 
@@ -457,6 +473,23 @@ async function buildSnapshotTree(
         }
 
         const fileHandle = entry as FileSystemFileHandle;
+
+        // Capacitor adapter: metadata (size/lastModified) is already on the
+        // handle from the native tree listing - skip the full content fetch.
+        const fakeMeta = (fileHandle as unknown as { __foliaFake?: boolean; size?: number; lastModified?: number });
+        if (fakeMeta.__foliaFake === true && typeof fakeMeta.size === 'number' && typeof fakeMeta.lastModified === 'number') {
+            const relativePath = `${currentPath}/${entry.name}`;
+            files.push({
+                name: entry.name,
+                relativePath,
+                kind,
+                size: fakeMeta.size,
+                lastModified: fakeMeta.lastModified,
+                signature: buildFileSignature(relativePath, fakeMeta.size, fakeMeta.lastModified)
+            });
+            relevantFileCount += 1;
+            continue;
+        }
 
         try {
             const file = await fileHandle.getFile();
@@ -1561,8 +1594,11 @@ async function getAccessibleFileHandle(song: LocalSong): Promise<FileSystemFileH
         fileHandleMap.set(song.id, fileHandle);
     }
 
-    if (fileHandle) {
+    if (fileHandle && !('__foliaFake' in fileHandle)) {
         return fileHandle;
+    }
+    if (fileHandle) {
+        return reviveLocalMusicHandle(fileHandle);
     }
 
     return await recoverFileHandleFromPersistedDirectory(song);

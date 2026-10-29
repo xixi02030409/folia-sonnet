@@ -21,4 +21,6 @@ export const getRuntimeEnvironment = (): RuntimeEnvironment => {
   return 'web';
 };
 
-export const supportsLocalMusicImport = (): boolean => !isCapacitorAndroid();
+// Android local music import is provided by the Capacitor adapter
+// (localMusicCapacitorAdapter.ts + native LocalMediaPlugin).
+export const supportsLocalMusicImport = (): boolean => true;

@@ -40,7 +40,7 @@ public class KugouServerPlugin extends Plugin {
                     call.resolve(ready);
                     return;
                 }
-                String dataDir = ctx.getFilesDir().getAbsolutePath();
+                String dataDir = bridge.getContext().getFilesDir().getAbsolutePath();
                 int actual = service.nativeStartNode(0, dataDir);
                 if (actual <= 0) {
                     call.reject("start_server failed (no free port after retries)");
@@ -52,7 +52,7 @@ public class KugouServerPlugin extends Plugin {
                 call.resolve(result);
             } catch (Throwable t) {
                 // UnsatisfiedLinkError / RuntimeException: report instead of crashing.
-                call.reject("Kugou server start failed: " + t.getClass().getSimpleName(), t);
+                call.reject("Kugou server start failed: " + t.getClass().getSimpleName());
             }
         }, "kugou-server-start");
         worker.setDaemon(true);
@@ -81,7 +81,7 @@ public class KugouServerPlugin extends Plugin {
             port = 0;
             call.resolve();
         } catch (Throwable t) {
-            call.reject("Kugou server stop failed: " + t.getClass().getSimpleName(), t);
+            call.reject("Kugou server stop failed: " + t.getClass().getSimpleName());
         }
     }
 }

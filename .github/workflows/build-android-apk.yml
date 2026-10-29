@@ -1,0 +1,53 @@
+name: Build Android APK
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      - name: Setup JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Accept Android SDK licenses
+        run: yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses >/dev/null || true
+
+      - name: Skip Electron binary download
+        run: echo "ELECTRON_SKIP_BINARY_DOWNLOAD=1" >> "$GITHUB_ENV"
+
+      - name: Prepare env file
+        run: |
+          [ -f .env.local ] || cp .env.example .env.local
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Build web bundle + sync to Capacitor
+        run: npm run cap:sync:android
+
+      - name: Make gradlew executable
+        run: chmod +x android/gradlew
+
+      - name: Build debug APK
+        run: cd android && ./gradlew assembleDebug --no-daemon
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: folia-sonnet-debug-apk
+          path: android/app/build/outputs/apk/debug/app-debug.apk
